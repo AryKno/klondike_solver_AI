@@ -9,9 +9,9 @@ class Game:
     game_history = []
     moves_history = []
     newCard_history = [] #save if a card has been faced up or picked up from the talon
-
     rollout_moves_lists = []
 
+    rolloutCounter = 0;
 
     __color = ["S","H","C","D"]
 
@@ -284,13 +284,18 @@ class Game:
             else:
                 self.makeMove(moves[i])
             #we save the move and the game status
+            print("playRollout.for.newCard_history")
+            print(self.newCard_history)
             self.moves_history.append(moves[i])
             self.game_history.append(self.saveGame())
             print("playRollout.inFor.lenGameHistory")
             print(len(self.game_history))
+            print("playRollout.inFor.moveHistory")
+            print(self.moves_history)
             #we do a rollout
-            print("playRollout.inFor.move[i]")
+            print("playRollout.inFor.move")
             print(moves[i])
+            self.rolloutCounter += 1
             self.iterationRollout(depth-1,depth)
             self.resetPrevMove()
             #ne pas oublier de supprimer le move précédent de l'historique des moves, l'état de jeu précédent, le newCard précédent
@@ -310,12 +315,15 @@ class Game:
                 maxV = self.rollout_moves_lists[i][-1]
         
         #We execute the moves of the moves_list
+        print("###############Game history size")
+        print(len(self.game_history))
         for i in range(0,len(self.rollout_moves_lists[maxI])-1): #-1 because the last index is the value of the moves list
             if self.rollout_moves_lists[maxI][i] == [0,0,0,0,0]:
                 self.dealPile()
             else:
                 self.makeMove(self.rollout_moves_lists[maxI][i])
             #we save the move and the game status
+            print()
             self.moves_history.append(self.rollout_moves_lists[maxI][i].copy())
             self.game_history.append(self.saveGame())
 
@@ -324,6 +332,11 @@ class Game:
         print(self.moves_history)
         print("playRollout.newCard_history")
         print(self.newCard_history)
+        print(self.game[2])
+        print(self.game[3])
+        print(self.game[4])
+        print(self.game[5])
+
         print("#####################################################################################################################################")
 
 
@@ -346,7 +359,7 @@ class Game:
             #we add the moves_list to the list of moves_list
             print("end of depth")
             self.addRolloutMove(maxDepth)
-            self.rollout_moves_lists[-1].append(self.evaluateGame()) #we append the value of the moves_list
+            self.rollout_moves_lists[-1].append(self.evaluateGame(self.rollout_moves_lists[-1])) #we append the value of the moves_list
             print(self.rollout_moves_lists[-1])
             return
 
@@ -387,26 +400,34 @@ class Game:
                 self.dealPile()
             else:
                 self.makeMove(moves[i])
+
+            print("iterationRollout.for.newCard_history")
+            print(self.newCard_history)
             #we save the move and the game status
             self.moves_history.append(moves[i])
             self.game_history.append(self.saveGame())
             print("playRollout.inFor.lenGameHistory")
             print(len(self.game_history))
+            print("playRollout.rolloutCounter")
+            print(self.rolloutCounter)
             print(self.moves_history)
             print("playRollout.inFor.move[i]")
             print(moves[i])
 
+            self.rolloutCounter += 1
+
             #we do a rollout
             self.iterationRollout(depth-1,maxDepth)
-            self.resetPrevMove()
             #ne pas oublier de supprimer le move précédent de l'historique des moves, l'état de jeu précédent, le newCard précédent
+            self.resetPrevMove()
+
         return
         
-    def evaluateGame(self):
-        #evaluate the game value, used by the rollout algorithm
+    def evaluateGame(self,moves_list):
+        #evaluate the game value, used by the rollout algorithm, by simply making the sum of the moves priority
         count = 0
-        for i in range(2,6):
-            count += len(self.game[i])
+        for i in range(0,len(moves_list)):
+            count += moves_list[i][0]
         return count
 
 
@@ -416,11 +437,18 @@ class Game:
         #we get the last moves
 
     def resetPrevMove(self):
-        del self.game_history[-1]
-        del self.moves_history[-1]
+        print("resetPrevMove.moves_history")
         print("resetPrevMove.newCard_history")
         print(self.newCard_history)
-        del self.newCard_history[-1]
+        print(self.moves_history[-1])
+
+        for i in range(0,len(self.game_history[-2])):
+            self.game[i] = self.game_history[-2][i].copy()
+
+        del self.game_history[-1]
+        del self.moves_history[-1]
+        if len(self.newCard_history) > 0:
+            del self.newCard_history[-1]
 
     def cardFacedUp(self,card):
         #return true if the card is in the talon, the pile, the suits or faced up in the build stacks
@@ -468,11 +496,18 @@ class Game:
         self.game[move[3]].extend(self.game[move[1]][move[2]:])
         del self.game[move[1]][move[2]:] #we delete the old position
 
-
+        print("makeMove.move")
+        print(move)
         #we faced-up the card faced-down, in the case of a build move
         if move[1] >= 6 and move[1] <= 12:
             #if the move come from a build stack
             if len(self.game[move[1]])>0: #if there is at least one card in the build stack
+
+                print("Colonne : ",end="")
+                print(self.game[move[1]])
+                print("Colonne précédente : ",end="")
+                for i in range(1,len(self.game_history)+1):
+                    print(self.game_history[-i][move[1]])
                 tmp = self.game[move[1]][move[2]-1]
                 del self.game[move[1]][move[2]-1]
                 self.game[move[1]].append((tmp[0],tmp[1],1))
@@ -536,15 +571,31 @@ class Game:
             
         #we check if anynew card has not been discovered for a while
         count = 0
-        if len(self.game[1])>=0:
-            if len(self.newCard_history)>15:
-                for i in range(1,15):
+
+
+
+        #if there's still card in the pile
+        anyFaceDown = False;
+        #test if there's still facedown cards
+
+        for i in range(6,len(self.game)):
+            for j in range(0,len(self.game[i])):
+                if self.game[i][j][-1] == 0:
+                    anyFaceDown = True
+                    print("Card face down")
+
+        #if there's still face down cards
+        if anyFaceDown == True and len(self.game[0]) >= 0 :
+            print("############################Verif")
+            for i in range(1,len(self.newCard_history)+1):
+                if self.newCard_history[-i] == 1:
+                    print("carte découverte")
+                    return False #no defeat
+                else:
                     print(count)
                     count +=1
-                    if self.newCard_history[-i] == 1:
-                        print("carte découverte")
-                        return False #no defeat
-                if count >=10:
+
+                if count >=20:
                     return True
         
         return False #no defeat
@@ -562,6 +613,18 @@ class Game:
                     if move[1] == prevMove[3] and move[2] == prevMove[4]+1 and move[3] == prevMove[1] and move[4] == prevMove[2]-1:
                         #if the move is between the same two builds stacks
                         prevGame = self.game_history[-i-1]       #A fonctionné avec -i-1
+                        #print("")
+                        #print("prevGame : ",end="")
+                        #print(prevGame)
+                        #print("")
+                        #print("self.game : ",end="")
+                        #print(self.game)
+                        #print("")
+                        #print("prevMove : ",end="")
+                        #print(prevMove)
+                        #print("move : ",end="")
+                        #print(move)
+                        #print("")
                         if prevGame[prevMove[1]][prevMove[2]] == self.game[move[1]][move[2]]: #if the card moved in n-1 is equal to the card moved in n
                             return True #then the move is a juggle between two stacks
         return False
@@ -572,6 +635,7 @@ class Game:
         for each in self.game:
             ret.append(each.copy())
         return ret
+
 
 
 

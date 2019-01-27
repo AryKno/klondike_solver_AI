@@ -26,7 +26,7 @@ def playCallBack():
     print(game.newCard_history)
 
 def playRolloutCallBack():
-    game.playRollout(3)
+    game.playRollout(30)
     #print("available moves : ",end="")
     #print(game.available_moves)
     fen.buildGame()
